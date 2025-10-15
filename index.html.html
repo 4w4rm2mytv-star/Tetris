@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tetris Clássico iOS</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    touch-action: none;
+  }
+  #gameCanvas {
+    background: #111;
+    image-rendering: pixelated;
+    touch-action: none;
+  }
+  #controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  button {
+    width: 60px;
+    height: 60px;
+    font-size: 20px;
+    border-radius: 10px;
+    border: none;
+    background: #222;
+    color: #0f0;
+  }
+  button:active {
+    background: #0f0;
+    color: #000;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="300" height="600"></canvas>
+<div id="controls">
+  <button id="left">←</button>
+  <button id="rotate">⟳</button>
+  <button id="right">→</button>
+  <button id="down">↓</button>
+</div>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const vh = window.innerHeight;
+  const vw = window.innerWidth;
+  const scale = Math.min(vw / 320, vh / 680);
+  canvas.style.width = `${300 * scale}px`;
+  canvas.style.height = `${600 * scale}px`;
+}
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', resizeCanvas);
+resizeCanvas();
+
+const COLS = 10, ROWS = 20, SIZE = 30;
+const COLORS = ['#000','#0ff','#f00','#0f0','#ff0','#f0f','#00f','#fa0'];
+const SHAPES = [
+  [],
+  [[1,1,1,1]],
+  [[2,2],[2,2]],
+  [[0,3,0],[3,3,3]],
+  [[0,4,4],[4,4,0]],
+  [[5,5,0],[0,5,5]],
+  [[6,0,0],[6,6,6]],
+  [[0,0,7],[7,7,7]]
+];
+let board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+let piece = null;
+let dropCounter = 0, dropInterval = 800;
+let lastTime = 0;
+
+function newPiece() {
+  const type = Math.floor(Math.random()*7)+1;
+  piece = {shape: SHAPES[type], x:3, y:0, color:type};
+  if (collide()) gameOver();
+}
+function collide() {
+  for (let y=0; y<piece.shape.length; y++)
+    for (let x=0; x<piece.shape[y].length; x++)
+      if (piece.shape[y][x] &&
+         (board[y+piece.y]?.[x+piece.x] ?? 1)) return true;
+  return false;
+}
+function merge() {
+  for (let y=0; y<piece.shape.length; y++)
+    for (let x=0; x<piece.shape[y].length; x++)
+      if (piece.shape[y][x])
+        board[y+piece.y][x+piece.x]=piece.color;
+}
+function clearLines() {
+  board = board.filter(r => r.some(v=>!v));
+  while (board.length<ROWS) board.unshift(Array(COLS).fill(0));
+}
+function rotate() {
+  const t = piece.shape[0].map((_,i)=>piece.shape.map(r=>r[i]).reverse());
+  const old = piece.shape;
+  piece.shape = t;
+  if (collide()) piece.shape = old;
+}
+function move(dir) {
+  piece.x += dir;
+  if (collide()) piece.x -= dir;
+}
+function drop() {
+  piece.y++;
+  if (collide()) {
+    piece.y--;
+    merge();
+    clearLines();
+    newPiece();
+  }
+  dropCounter = 0;
+}
+function gameOver() {
+  board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  newPiece();
+}
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for (let y=0;y<ROWS;y++)
+    for (let x=0;x<COLS;x++){
+      const val=board[y][x];
+      if(val){ctx.fillStyle=COLORS[val];ctx.fillRect(x*SIZE,y*SIZE,SIZE-1,SIZE-1);}
+    }
+  for (let y=0;y<piece.shape.length;y++)
+    for (let x=0;x<piece.shape[y].length;x++)
+      if(piece.shape[y][x]){
+        ctx.fillStyle=COLORS[piece.color];
+        ctx.fillRect((x+piece.x)*SIZE,(y+piece.y)*SIZE,SIZE-1,SIZE-1);
+      }
+}
+function update(time=0){
+  const delta=time-lastTime;
+  lastTime=time;
+  dropCounter+=delta;
+  if(dropCounter>dropInterval) drop();
+  draw();
+  requestAnimationFrame(update);
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft')move(-1);
+  else if(e.key==='ArrowRight')move(1);
+  else if(e.key==='ArrowDown')drop();
+  else if(e.key==='ArrowUp')rotate();
+});
+document.getElementById('left').onclick=()=>move(-1);
+document.getElementById('right').onclick=()=>move(1);
+document.getElementById('down').onclick=()=>drop();
+document.getElementById('rotate').onclick=()=>rotate();
+
+newPiece();
+update();
+</script>
+</body>
+</html>
